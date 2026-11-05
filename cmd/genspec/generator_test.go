@@ -26,3 +26,18 @@ func TestBuildReadsDescriptionsFromTypedRoutes(t *testing.T) {
 		t.Fatalf("unexpected field metadata: %#v", title)
 	}
 }
+
+func TestBuildResolvesHandlersRegisteredInAnotherPackage(t *testing.T) {
+	document, err := build(filepath.Join("testdata", "service"), "Fixture API", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	operation := document.Paths["/notes"]["post"]
+	if operation == nil || operation.RequestBody == nil {
+		t.Fatalf("expected a request body for POST /notes: %#v", operation)
+	}
+	if _, ok := document.Components.Schemas["notes.noteInput"]; !ok {
+		t.Fatalf("expected the notes.noteInput schema, got %v", document.Components.Schemas)
+	}
+}
