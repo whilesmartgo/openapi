@@ -183,8 +183,8 @@ func readRoutes(api *packages.Package, handlers map[string]*handler) ([]route, e
 	var routes []route
 	seen := map[string]bool{}
 
-	var walk func(fn *ast.FuncDecl, prefixes map[string]string, depth int)
-	walk = func(fn *ast.FuncDecl, prefixes map[string]string, depth int) {
+	var walk func(fn *ast.FuncDecl, pkg *packages.Package, prefixes map[string]string, depth int)
+	walk = func(fn *ast.FuncDecl, pkg *packages.Package, prefixes map[string]string, depth int) {
 		if fn == nil || depth > 4 {
 			return
 		}
@@ -195,7 +195,7 @@ func readRoutes(api *packages.Package, handlers map[string]*handler) ([]route, e
 					prefixes[name] = prefix
 				}
 			case *ast.CallExpr:
-				if r, ok := routeCall(api, node, prefixes); ok {
+				if r, ok := routeCall(pkg, node, prefixes); ok {
 					if skip(r.Path) {
 						return true
 					}
@@ -207,14 +207,14 @@ func readRoutes(api *packages.Package, handlers map[string]*handler) ([]route, e
 					routes = append(routes, r)
 					return true
 				}
-				if target, bound, ok := delegated(api, handlers, node, prefixes); ok {
-					walk(target, bound, depth+1)
+				if target, bound, ok := delegated(pkg, handlers, node, prefixes); ok {
+					walk(target.decl, target.pkg, bound, depth+1)
 				}
 			}
 			return true
 		})
 	}
-	walk(setup, map[string]string{"router": "", "api": ""}, 0)
+	walk(setup, api, map[string]string{"router": "", "api": ""}, 0)
 
 	sort.Slice(routes, func(i, j int) bool {
 		if routes[i].Path != routes[j].Path {
@@ -225,7 +225,7 @@ func readRoutes(api *packages.Package, handlers map[string]*handler) ([]route, e
 	return routes, nil
 }
 
-func delegated(api *packages.Package, handlers map[string]*handler, call *ast.CallExpr, prefixes map[string]string) (*ast.FuncDecl, map[string]string, bool) {
+func delegated(api *packages.Package, handlers map[string]*handler, call *ast.CallExpr, prefixes map[string]string) (*handler, map[string]string, bool) {
 	index := -1
 	prefix := ""
 	for i, arg := range call.Args {
@@ -263,7 +263,7 @@ func delegated(api *packages.Package, handlers map[string]*handler, call *ast.Ca
 	for _, field := range target.decl.Type.Params.List {
 		for _, name := range field.Names {
 			if position == index {
-				return target.decl, map[string]string{name.Name: prefix}, true
+				return target, map[string]string{name.Name: prefix}, true
 			}
 			position++
 		}

@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	"example.com/service/notes"
 	"github.com/gin-gonic/gin"
 	"github.com/whilesmartgo/openapi"
 )
@@ -32,4 +33,5 @@ func main() {
 		Tags:        []string{"calendar"},
 		Deprecated:  true,
 	}))
+	(&notes.Handler{}).Routes(router)
 }
