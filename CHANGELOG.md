@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0 (unreleased)
+
+- Describe query parameters read through `apicontract.BindQuery` with their types, formats, bounds and deprecations.
+- Write the API contract version to `info.x-whilesmart-contract` with `-contract`.
+
 ## 0.1.1 (2026-11-05)
 
 - Resolve handlers in routes registered from other packages, so their request bodies, responses and schemas are documented.

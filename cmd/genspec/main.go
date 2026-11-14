@@ -20,6 +20,7 @@ func main() {
 	title := flag.String("title", "", "API title")
 	public := flag.Bool("public", false, "do not apply authentication globally")
 	out := flag.String("o", "", "write here instead of stdout")
+	contract := flag.String("contract", "", "API contract version the service meets, written to info.x-whilesmart-contract")
 	flag.Parse()
 	if *title == "" {
 		log.Fatal("-title is required")
@@ -29,6 +30,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	spec.Info.Contract = *contract
 
 	encoded, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {
@@ -143,11 +145,23 @@ func build(root, title string, secured bool) (*openAPI, error) {
 					}
 				}
 			}
+			declared, err := contractParams(fn.pkg, fn.decl)
+			if err != nil {
+				return nil, fmt.Errorf("%s %s: %w", r.Method, r.Path, err)
+			}
+			named := map[string]bool{}
+			for _, q := range declared {
+				named[q.Name] = true
+			}
 			for _, q := range queryParams(fn.pkg, fn.decl) {
+				if named[q] {
+					continue
+				}
 				op.Parameters = append(op.Parameters, parameter{
 					Name: q, In: "query", Schema: &schema{Type: "string"},
 				})
 			}
+			op.Parameters = append(op.Parameters, declared...)
 		}
 
 		path := openAPIPath(r.Path)

@@ -11,7 +11,7 @@ Use it when you want accurate OpenAPI without annotation blocks or a second list
 The generator finds:
 
 - registered routes and HTTP methods
-- path and query parameters
+- path and query parameters, including typed query structs read with [`apicontract.BindQuery`](https://github.com/whilesmartgo/apicontract)
 - request bodies bound by handlers
 - typed JSON responses
 - required fields and enum values from validation tags
@@ -38,6 +38,12 @@ type EventInput struct {
 ```
 
 Descriptions are optional. Routes and schemas are still generated when no prose is supplied.
+
+## Query structs
+
+When a handler reads its query through `apicontract.BindQuery` or `apicontract.BindValues`, the generator describes the struct's parameters with the same names, types, formats, bounds and deprecations the parser applies.
+
+Pass `-contract 0.1` to state in `info.x-whilesmart-contract` the API contract version the service meets.
 
 ## Install
 
