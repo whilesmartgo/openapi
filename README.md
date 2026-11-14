@@ -41,9 +41,9 @@ Descriptions are optional. Routes and schemas are still generated when no prose 
 
 ## Query structs
 
-When a handler reads its query through `apicontract.BindQuery` or `apicontract.BindValues`, the generator describes the struct's parameters with the same names, types, formats, bounds and deprecations the parser applies.
+For query structs read with `apicontract.BindQuery` or `apicontract.BindValues`, the generator uses the parser's rules to describe parameter names, types, formats, bounds and deprecated status.
 
-Pass `-contract 0.1` to state in `info.x-whilesmart-contract` the API contract version the service meets.
+Pass `-contract 0.1` to set `info.x-whilesmart-contract` to the API contract version the service meets.
 
 ## Install
 

@@ -2,7 +2,7 @@
 
 ## 0.2.0 (unreleased)
 
-- Describe query parameters read through `apicontract.BindQuery` with their types, formats, bounds and deprecations.
+- Describe query parameters read with `apicontract.BindQuery`, including their types, formats, bounds and deprecated status.
 - Write the API contract version to `info.x-whilesmart-contract` with `-contract`.
 
 ## 0.1.1 (2026-11-05)
