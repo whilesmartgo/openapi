@@ -23,6 +23,7 @@ type info struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Version     string `json:"version"`
+	Contract    string `json:"x-whilesmart-contract,omitempty"`
 }
 
 type components struct {
@@ -42,11 +43,13 @@ type operation struct {
 }
 
 type parameter struct {
-	Name     string  `json:"name"`
-	In       string  `json:"in"`
-	Required bool    `json:"required,omitempty"`
-	Schema   *schema `json:"schema,omitempty"`
-	Rest     bool    `json:"x-rest-of-path,omitempty"`
+	Name        string `json:"name"`
+	In          string `json:"in"`
+	Description string `json:"description,omitempty"`
+	Required    bool   `json:"required,omitempty"`
+	Deprecated  bool   `json:"deprecated,omitempty"`
+	Schema      any    `json:"schema,omitempty"`
+	Rest        bool   `json:"x-rest-of-path,omitempty"`
 }
 
 type requestBody struct {
@@ -60,7 +63,7 @@ type response struct {
 }
 
 type mediaType struct {
-	Schema *schema `json:"schema,omitempty"`
+	Schema any `json:"schema,omitempty"`
 }
 
 type schema struct {
@@ -74,6 +77,7 @@ type schema struct {
 	Example              string             `json:"example,omitempty"`
 	AdditionalProperties *schema            `json:"additionalProperties,omitempty"`
 	Enum                 []string           `json:"enum,omitempty"`
+	OneOf                []*schema          `json:"oneOf,omitempty"`
 }
 
 type schemaSet struct {

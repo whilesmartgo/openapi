@@ -11,8 +11,9 @@ Use it when you want accurate OpenAPI without annotation blocks or a second list
 The generator finds:
 
 - registered routes and HTTP methods
-- path and query parameters
-- request bodies bound by handlers
+- path and query parameters, including typed query structs read with [`apicontract.BindQuery`](https://github.com/whilesmartgo/apicontract)
+- request bodies bound by handlers, including structs read with `apicontract.BindJSON`
+- problem responses for calls to `apicontract` parsers
 - typed JSON responses
 - required fields and enum values from validation tags
 - operation and field descriptions you choose to add
@@ -38,6 +39,25 @@ type EventInput struct {
 ```
 
 Descriptions are optional. Routes and schemas are still generated when no prose is supplied.
+
+## API contract structs
+
+The generator reads query structs passed to `apicontract.BindQuery` or `apicontract.BindValues`. It uses the parser's rules for parameter names, types, formats, bounds and deprecation.
+
+For structs passed to `apicontract.BindJSON` or `apicontract.BindJSONBytes`, it uses the parser's request body schema. This includes required fields, bounds, nullable optional pointers and maps, nested objects and `additionalProperties: false` for struct objects.
+
+It also documents `application/problem+json` responses for handler calls to:
+
+- `BindQuery` or `BindValues`: `400` and `422`
+- `BindJSONBytes`: `400`, `413` and `422`
+- `BindJSON`: `400`, `413`, `415` and `422`
+- `apicontract.IdempotencyKey`: `400`
+
+Responses written with `apicontract.WriteJSON` at a constant success status, or with `apicontract.WriteList`, get schemas from their types. Responses with status `204` or `205` have no body. `WriteError` and `WriteProblem` passed a `NewProblem` add problem responses for constant error statuses.
+
+The generator reads calls made directly in a handler method, including calls with explicit type arguments and closures called on the spot, with or without parentheses. It skips uncalled closures and does not follow calls through variables or helper functions. Calls hidden in wrappers therefore add no body or responses. A body struct with an unresolved type parameter stops generation with an error.
+
+Pass `-contract 0.1` to write `0.1` to `info.x-whilesmart-contract`. This records the declared contract version; it does not check compliance.
 
 ## Install
 

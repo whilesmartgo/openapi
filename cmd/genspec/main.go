@@ -20,6 +20,7 @@ func main() {
 	title := flag.String("title", "", "API title")
 	public := flag.Bool("public", false, "do not apply authentication globally")
 	out := flag.String("o", "", "write here instead of stdout")
+	contract := flag.String("contract", "", "API contract version the service meets, written to info.x-whilesmart-contract")
 	flag.Parse()
 	if *title == "" {
 		log.Fatal("-title is required")
@@ -29,6 +30,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	spec.Info.Contract = *contract
 
 	encoded, err := json.MarshalIndent(spec, "", "  ")
 	if err != nil {
@@ -53,12 +55,15 @@ type handler struct {
 func build(root, title string, secured bool) (*openAPI, error) {
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes |
-			packages.NeedTypesInfo | packages.NeedDeps | packages.NeedImports,
+			packages.NeedTypesInfo | packages.NeedDeps | packages.NeedImports | packages.NeedTypesSizes,
 		Dir: root,
 	}
 	pkgs, err := packages.Load(cfg, "./...")
 	if err != nil {
 		return nil, err
+	}
+	if len(pkgs) > 0 && pkgs[0].TypesSizes != nil {
+		targetSizes = pkgs[0].TypesSizes
 	}
 	var api *packages.Package
 	for _, pkg := range pkgs {
@@ -124,7 +129,17 @@ func build(root, title string, secured bool) (*openAPI, error) {
 		}
 
 		if fn := handlers[r.Handler]; fn != nil {
-			if bound, contentType := boundRequestType(fn.pkg, fn.decl); bound != nil {
+			body, err := contractBody(fn.pkg, fn.decl)
+			if err != nil {
+				return nil, fmt.Errorf("%s %s: %w", r.Method, r.Path, err)
+			}
+			if body != nil {
+				data, _ := json.Marshal(body)
+				op.RequestBody = &requestBody{}
+				if err := json.Unmarshal(data, op.RequestBody); err != nil {
+					return nil, fmt.Errorf("%s %s: %w", r.Method, r.Path, err)
+				}
+			} else if bound, contentType := boundRequestType(fn.pkg, fn.decl); bound != nil {
 				if ref := schemas.add(bound); ref != nil {
 					op.RequestBody = &requestBody{
 						Required: true,
@@ -132,7 +147,36 @@ func build(root, title string, secured bool) (*openAPI, error) {
 					}
 				}
 			}
-			if returned, status := typedResponse(fn.pkg, fn.decl); returned != nil {
+			if written := contractResponses(fn.pkg, fn.decl); len(written) > 0 {
+				delete(op.Responses, "200")
+				shapes := map[string][]*schema{}
+				for _, entry := range written {
+					if _, ok := op.Responses[entry.status]; !ok {
+						op.Responses[entry.status] = response{Description: "Success"}
+					}
+					if entry.status == "204" || entry.status == "205" || entry.value == nil {
+						continue
+					}
+					ref := schemas.add(entry.value)
+					if ref == nil {
+						continue
+					}
+					if entry.list {
+						ref = &schema{Type: "object", Required: []string{"items"}, Properties: map[string]*schema{
+							"items":       {Type: "array", Items: ref},
+							"next_cursor": {Type: "string"},
+						}}
+					}
+					shapes[entry.status] = append(shapes[entry.status], ref)
+				}
+				for status, options := range shapes {
+					described := options[0]
+					if len(options) > 1 {
+						described = &schema{OneOf: options}
+					}
+					op.Responses[status] = response{Description: "Success", Content: map[string]mediaType{"application/json": {Schema: described}}}
+				}
+			} else if returned, status := typedResponse(fn.pkg, fn.decl); returned != nil {
 				if ref := schemas.add(returned); ref != nil {
 					if status != "200" {
 						delete(op.Responses, "200")
@@ -143,11 +187,28 @@ func build(root, title string, secured bool) (*openAPI, error) {
 					}
 				}
 			}
+			for status, problem := range contractErrors(fn.pkg, fn.decl) {
+				if _, ok := op.Responses[status]; !ok {
+					op.Responses[status] = problem
+				}
+			}
+			declared, err := contractParams(fn.pkg, fn.decl)
+			if err != nil {
+				return nil, fmt.Errorf("%s %s: %w", r.Method, r.Path, err)
+			}
+			named := map[string]bool{}
+			for _, q := range declared {
+				named[q.Name] = true
+			}
 			for _, q := range queryParams(fn.pkg, fn.decl) {
+				if named[q] {
+					continue
+				}
 				op.Parameters = append(op.Parameters, parameter{
 					Name: q, In: "query", Schema: &schema{Type: "string"},
 				})
 			}
+			op.Parameters = append(op.Parameters, declared...)
 		}
 
 		path := openAPIPath(r.Path)
