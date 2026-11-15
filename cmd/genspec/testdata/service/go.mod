@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/gin-gonic/gin v0.0.0
-	github.com/whilesmartgo/apicontract v0.1.1-0.20261115100312-131aacdb78fa
+	github.com/whilesmartgo/apicontract v0.1.1
 	github.com/whilesmartgo/openapi v0.0.0
 )
 
