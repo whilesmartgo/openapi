@@ -1,12 +1,13 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.0 (2026-11-15)
 
 - Describe query structs passed to `apicontract.BindQuery` or `apicontract.BindValues`, including types, formats, bounds and deprecation.
 - Use the parser's request body schema for structs passed to `apicontract.BindJSON` or `apicontract.BindJSONBytes`.
 - Document `application/problem+json` responses for calls to `apicontract` parsers.
 - Describe responses written with `apicontract.WriteJSON`, `WriteList` and `WriteError`, plus `WriteProblem` passed a `NewProblem` with a constant error status. Omit bodies for `204` and `205` responses.
 - Follow type aliases and defined pointer types as `apicontract` does at run time. Read calls with explicit type arguments and closures called on the spot, including parenthesized closures. Skip uncalled closures.
+- Document every body a handler binds and every success response it writes, using `oneOf` where one status has several shapes. Size `int` for the platform being analysed.
 - Record the declared API contract version in `info.x-whilesmart-contract` with `-contract`.
 
 ## 0.1.1 (2026-11-05)
