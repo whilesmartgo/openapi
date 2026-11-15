@@ -77,6 +77,7 @@ type schema struct {
 	Example              string             `json:"example,omitempty"`
 	AdditionalProperties *schema            `json:"additionalProperties,omitempty"`
 	Enum                 []string           `json:"enum,omitempty"`
+	OneOf                []*schema          `json:"oneOf,omitempty"`
 }
 
 type schemaSet struct {

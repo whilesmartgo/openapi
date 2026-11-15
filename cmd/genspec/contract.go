@@ -86,13 +86,15 @@ func contractCall(api *packages.Package, fun ast.Expr) string {
 
 // contractBody describes the struct the handler passes to apicontract.BindJSON
 // or BindJSONBytes as an OpenAPI request body.
+// When it binds more than one struct, the body schema is a oneOf of them.
 func contractBody(api *packages.Package, fn *ast.FuncDecl) (any, error) {
-	var body any
+	var bodies []map[string]any
+	seen := map[types.Type]bool{}
 	var failure error
 	inspectDirect(fn, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
-		if !ok || body != nil || failure != nil || len(call.Args) < 2 {
-			return true
+		if !ok || failure != nil || len(call.Args) < 2 {
+			return failure == nil
 		}
 		if name := contractCall(api, call.Fun); name != "BindJSON" && name != "BindJSONBytes" {
 			return true
@@ -102,18 +104,32 @@ func contractBody(api *packages.Package, fn *ast.FuncDecl) (any, error) {
 			return true
 		}
 		structure, ok := target.Underlying().(*types.Struct)
-		if !ok {
+		if !ok || seen[target] {
 			return true
 		}
+		seen[target] = true
 		described, err := apicontract.OpenAPIRequestBodyOf(contractFields(structure, map[types.Type]bool{target: true}))
 		if err != nil {
 			failure = fmt.Errorf("%s: %w", target, err)
 			return false
 		}
-		body = described
-		return false
+		bodies = append(bodies, described)
+		return true
 	})
-	return body, failure
+	if failure != nil || len(bodies) == 0 {
+		return nil, failure
+	}
+	if len(bodies) == 1 {
+		return bodies[0], nil
+	}
+	var options []any
+	for _, body := range bodies {
+		options = append(options, body["content"].(map[string]any)["application/json"].(map[string]any)["schema"])
+	}
+	return map[string]any{
+		"required": true,
+		"content":  map[string]any{"application/json": map[string]any{"schema": map[string]any{"oneOf": options}}},
+	}, nil
 }
 
 // contractErrors returns the problem responses a handler can write through
@@ -250,18 +266,12 @@ func describe(t types.Type, seen map[types.Type]bool) apicontract.Field {
 	return apicontract.Field{Type: apicontract.FieldOther}
 }
 
-// bits is the size reflection reports for a numeric kind, assuming a 64-bit
-// target for int.
+// targetSizes holds the sizes of the platform the analyzed packages are built
+// for, so int has the width reflection will report there.
+var targetSizes types.Sizes = types.SizesFor("gc", "amd64")
+
 func bits(basic *types.Basic) int {
-	switch basic.Kind() {
-	case types.Int8:
-		return 8
-	case types.Int16:
-		return 16
-	case types.Int32, types.Float32:
-		return 32
-	}
-	return 64
+	return int(targetSizes.Sizeof(basic) * 8)
 }
 
 // pointerTo returns the type a pointer argument points to, including defined
@@ -306,14 +316,31 @@ func constantStatus(api *packages.Package, call *ast.CallExpr, index int) (int, 
 	return int(status), ok && status >= 100 && status <= 599
 }
 
-// contractResponse finds the success response a handler writes with
+// writtenResponse is a success response a handler writes with
 // apicontract.WriteJSON or WriteList. For WriteList, value is the item type.
 // value is nil for a payload with no static type, such as nil.
-func contractResponse(api *packages.Package, fn *ast.FuncDecl) (value types.Type, status string, list bool) {
+type writtenResponse struct {
+	status string
+	value  types.Type
+	list   bool
+}
+
+// contractResponses returns every success response the handler writes, in
+// source order, without repeats.
+func contractResponses(api *packages.Package, fn *ast.FuncDecl) []writtenResponse {
+	var found []writtenResponse
+	add := func(next writtenResponse) {
+		for _, existing := range found {
+			if existing.status == next.status && existing.list == next.list && (existing.value == next.value || existing.value != nil && next.value != nil && types.Identical(existing.value, next.value)) {
+				return
+			}
+		}
+		found = append(found, next)
+	}
 	inspectDirect(fn, func(n ast.Node) bool {
 		call, ok := n.(*ast.CallExpr)
-		if !ok || status != "" {
-			return status == ""
+		if !ok {
+			return true
 		}
 		switch contractCall(api, call.Fun) {
 		case "WriteJSON":
@@ -321,21 +348,22 @@ func contractResponse(api *packages.Package, fn *ast.FuncDecl) (value types.Type
 			if !ok || code >= 300 || len(call.Args) < 3 {
 				return true
 			}
-			status = strconv.Itoa(code)
+			next := writtenResponse{status: strconv.Itoa(code)}
 			if typed := api.TypesInfo.TypeOf(call.Args[2]); typed != nil && !isUntypedNil(typed) {
-				value = typed
+				next.value = typed
 			}
+			add(next)
 		case "WriteList":
 			if len(call.Args) < 2 {
 				return true
 			}
 			if slice, ok := types.Unalias(api.TypesInfo.TypeOf(call.Args[1])).Underlying().(*types.Slice); ok {
-				value, status, list = slice.Elem(), "200", true
+				add(writtenResponse{status: "200", value: slice.Elem(), list: true})
 			}
 		}
-		return status == ""
+		return true
 	})
-	return value, status, list
+	return found
 }
 
 func isUntypedNil(t types.Type) bool {

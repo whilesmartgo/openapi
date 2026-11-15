@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"go/types"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -204,5 +205,27 @@ func TestBuildReadsEveryContractWriterForm(t *testing.T) {
 	list, _ := json.Marshal(document.Paths["/tasks"]["get"].Responses["200"])
 	if !strings.Contains(string(list), `"required":["items"]`) {
 		t.Errorf("WriteList with explicit type arguments must describe the envelope: %s", list)
+	}
+}
+
+func TestBuildDocumentsEveryBodyAndResponse(t *testing.T) {
+	document, err := build(filepath.Join("testdata", "service"), "Fixture API", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive := document.Paths["/tasks/{id}/archive"]["post"]
+	body, _ := json.Marshal(archive.RequestBody)
+	if !strings.Contains(string(body), `"oneOf"`) || !strings.Contains(string(body), `"reason"`) || !strings.Contains(string(body), `"at"`) {
+		t.Errorf("both bodies must be documented: %s", body)
+	}
+	ok, _ := json.Marshal(archive.Responses["200"])
+	if !strings.Contains(string(ok), `"oneOf"`) {
+		t.Errorf("both 200 shapes must be documented: %s", ok)
+	}
+	if _, found := archive.Responses["202"]; !found {
+		t.Errorf("202 must be documented: %v", archive.Responses)
+	}
+	if got := bits(types.Typ[types.Int]); got != int(targetSizes.Sizeof(types.Typ[types.Int])*8) {
+		t.Errorf("int is %d bits", got)
 	}
 }

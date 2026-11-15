@@ -96,6 +96,29 @@ func (*tasksHandler) List(context *gin.Context) {
 	_ = apicontract.WriteList[taskOutput](context.Writer, []taskOutput{}, "")
 }
 
+type archiveInput struct {
+	Reason string `json:"reason"`
+}
+
+type restoreInput struct {
+	At int `json:"at"`
+}
+
+type archived struct {
+	Archived bool `json:"archived"`
+}
+
+func (*tasksHandler) Archive(context *gin.Context) {
+	if context.Request.URL.Query().Get("restore") != "" {
+		_ = apicontract.BindJSON(context.Request, &restoreInput{})
+		_ = apicontract.WriteJSON(context.Writer, http.StatusOK, taskOutput{})
+		return
+	}
+	_ = apicontract.BindJSON(context.Request, &archiveInput{})
+	_ = apicontract.WriteJSON(context.Writer, http.StatusOK, archived{})
+	_ = apicontract.WriteJSON(context.Writer, http.StatusAccepted, archived{})
+}
+
 func (*tasksHandler) Delete(context *gin.Context) {
 	_ = apicontract.WriteJSON(context.Writer, http.StatusNoContent, nil)
 }
@@ -130,6 +153,7 @@ func main() {
 	router.POST("/tasks", tasks.Create)
 	router.GET("/tasks", tasks.List)
 	router.DELETE("/tasks/:id", tasks.Delete)
+	router.POST("/tasks/:id/archive", tasks.Archive)
 	router.POST("/tasks/reset", tasks.Reset)
 	router.PUT("/tasks/:id", tasks.Rename)
 	(&notes.Handler{}).Routes(router)

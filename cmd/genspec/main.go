@@ -55,12 +55,15 @@ type handler struct {
 func build(root, title string, secured bool) (*openAPI, error) {
 	cfg := &packages.Config{
 		Mode: packages.NeedName | packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes |
-			packages.NeedTypesInfo | packages.NeedDeps | packages.NeedImports,
+			packages.NeedTypesInfo | packages.NeedDeps | packages.NeedImports | packages.NeedTypesSizes,
 		Dir: root,
 	}
 	pkgs, err := packages.Load(cfg, "./...")
 	if err != nil {
 		return nil, err
+	}
+	if len(pkgs) > 0 && pkgs[0].TypesSizes != nil {
+		targetSizes = pkgs[0].TypesSizes
 	}
 	var api *packages.Package
 	for _, pkg := range pkgs {
@@ -144,24 +147,35 @@ func build(root, title string, secured bool) (*openAPI, error) {
 					}
 				}
 			}
-			if value, status, list := contractResponse(fn.pkg, fn.decl); status != "" {
-				if status != "200" {
-					delete(op.Responses, "200")
-				}
-				success := response{Description: "Success"}
-				if status != "204" && status != "205" && value != nil {
-					if ref := schemas.add(value); ref != nil {
-						var described any = ref
-						if list {
-							described = &schema{Type: "object", Required: []string{"items"}, Properties: map[string]*schema{
-								"items":       {Type: "array", Items: ref},
-								"next_cursor": {Type: "string"},
-							}}
-						}
-						success.Content = map[string]mediaType{"application/json": {Schema: described}}
+			if written := contractResponses(fn.pkg, fn.decl); len(written) > 0 {
+				delete(op.Responses, "200")
+				shapes := map[string][]*schema{}
+				for _, entry := range written {
+					if _, ok := op.Responses[entry.status]; !ok {
+						op.Responses[entry.status] = response{Description: "Success"}
 					}
+					if entry.status == "204" || entry.status == "205" || entry.value == nil {
+						continue
+					}
+					ref := schemas.add(entry.value)
+					if ref == nil {
+						continue
+					}
+					if entry.list {
+						ref = &schema{Type: "object", Required: []string{"items"}, Properties: map[string]*schema{
+							"items":       {Type: "array", Items: ref},
+							"next_cursor": {Type: "string"},
+						}}
+					}
+					shapes[entry.status] = append(shapes[entry.status], ref)
 				}
-				op.Responses[status] = success
+				for status, options := range shapes {
+					described := options[0]
+					if len(options) > 1 {
+						described = &schema{OneOf: options}
+					}
+					op.Responses[status] = response{Description: "Success", Content: map[string]mediaType{"application/json": {Schema: described}}}
+				}
 			} else if returned, status := typedResponse(fn.pkg, fn.decl); returned != nil {
 				if ref := schemas.add(returned); ref != nil {
 					if status != "200" {
