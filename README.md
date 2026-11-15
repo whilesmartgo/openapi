@@ -57,7 +57,7 @@ Responses written with `apicontract.WriteJSON` at a constant success status, or 
 
 The generator reads calls made directly in a handler method, including calls with explicit type arguments and closures called on the spot, with or without parentheses. It skips uncalled closures and does not follow calls through variables or helper functions. Calls hidden in wrappers therefore add no body or responses. A body struct with an unresolved type parameter stops generation with an error.
 
-Pass `-contract 0.2` to write `0.2` to `info.x-whilesmart-contract`. This records the declared contract version; it does not check compliance.
+Pass `-contract 0.1` to write `0.1` to `info.x-whilesmart-contract`. This records the declared contract version; it does not check compliance.
 
 ## Install
 

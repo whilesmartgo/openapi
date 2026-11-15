@@ -1,7 +1,7 @@
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
 github.com/google/go-cmp v0.6.0/go.mod h1:17dUlkBOakJ0+DkrSSNjCkIjxS6bF9zb3elmeNGIjoY=
-github.com/whilesmartgo/apicontract v0.1.1-0.20261115031627-62c9b44ab3d9 h1:T44zaFfWIOAAbuFYf6T4BdWqCy57UZ5z80qtlaawWV8=
-github.com/whilesmartgo/apicontract v0.1.1-0.20261115031627-62c9b44ab3d9/go.mod h1:gwx0tknzau6POQtv7aHdNjNUAQSRoPGvq7+fMXFNfe4=
+github.com/whilesmartgo/apicontract v0.1.1-0.20261115100312-131aacdb78fa h1:TrPz6UxWdoOPgH0YRENMp/e9pZWnVpd9KA2smIPjHug=
+github.com/whilesmartgo/apicontract v0.1.1-0.20261115100312-131aacdb78fa/go.mod h1:gwx0tknzau6POQtv7aHdNjNUAQSRoPGvq7+fMXFNfe4=
 golang.org/x/mod v0.27.0 h1:kb+q2PyFnEADO2IEF935ehFUXlWiNjJWtRNgBLSfbxQ=
 golang.org/x/mod v0.27.0/go.mod h1:rWI627Fq0DEoudcK+MBkNkCe0EetEaDSwJJkCcjpazc=
 golang.org/x/sync v0.16.0 h1:ycBJEhp9p4vXvUZNszeOq0kGTPghopOL8q0fq3vstxw=
