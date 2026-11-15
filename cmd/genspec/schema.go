@@ -63,7 +63,7 @@ type response struct {
 }
 
 type mediaType struct {
-	Schema *schema `json:"schema,omitempty"`
+	Schema any `json:"schema,omitempty"`
 }
 
 type schema struct {

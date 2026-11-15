@@ -126,7 +126,17 @@ func build(root, title string, secured bool) (*openAPI, error) {
 		}
 
 		if fn := handlers[r.Handler]; fn != nil {
-			if bound, contentType := boundRequestType(fn.pkg, fn.decl); bound != nil {
+			body, err := contractBody(fn.pkg, fn.decl)
+			if err != nil {
+				return nil, fmt.Errorf("%s %s: %w", r.Method, r.Path, err)
+			}
+			if body != nil {
+				data, _ := json.Marshal(body)
+				op.RequestBody = &requestBody{}
+				if err := json.Unmarshal(data, op.RequestBody); err != nil {
+					return nil, fmt.Errorf("%s %s: %w", r.Method, r.Path, err)
+				}
+			} else if bound, contentType := boundRequestType(fn.pkg, fn.decl); bound != nil {
 				if ref := schemas.add(bound); ref != nil {
 					op.RequestBody = &requestBody{
 						Required: true,
@@ -134,7 +144,25 @@ func build(root, title string, secured bool) (*openAPI, error) {
 					}
 				}
 			}
-			if returned, status := typedResponse(fn.pkg, fn.decl); returned != nil {
+			if value, status, list := contractResponse(fn.pkg, fn.decl); status != "" {
+				if status != "200" {
+					delete(op.Responses, "200")
+				}
+				success := response{Description: "Success"}
+				if status != "204" && status != "205" && value != nil {
+					if ref := schemas.add(value); ref != nil {
+						var described any = ref
+						if list {
+							described = &schema{Type: "object", Required: []string{"items"}, Properties: map[string]*schema{
+								"items":       {Type: "array", Items: ref},
+								"next_cursor": {Type: "string"},
+							}}
+						}
+						success.Content = map[string]mediaType{"application/json": {Schema: described}}
+					}
+				}
+				op.Responses[status] = success
+			} else if returned, status := typedResponse(fn.pkg, fn.decl); returned != nil {
 				if ref := schemas.add(returned); ref != nil {
 					if status != "200" {
 						delete(op.Responses, "200")
@@ -143,6 +171,11 @@ func build(root, title string, secured bool) (*openAPI, error) {
 						Description: "Success",
 						Content:     map[string]mediaType{"application/json": {Schema: ref}},
 					}
+				}
+			}
+			for status, problem := range contractErrors(fn.pkg, fn.decl) {
+				if _, ok := op.Responses[status]; !ok {
+					op.Responses[status] = problem
 				}
 			}
 			declared, err := contractParams(fn.pkg, fn.decl)
